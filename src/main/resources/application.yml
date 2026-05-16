@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+gateway:
+  routes:
+    - id: route-auth
+      path-prefix: /gw/auth
+      target-uri: http://localhost:8081
+      strip-prefix: /gw/auth
+      requires-auth: false
+
+    - id: route-core
+      path-prefix: /gw/core
+      target-uri: http://localhost:8082
+      strip-prefix: /gw/core
+      requires-auth: true
+
+    - id: route-admin
+      path-prefix: /gw/admin
+      target-uri: http://localhost:8083
+      strip-prefix: /gw/admin
+      requires-auth: true
