@@ -8,9 +8,7 @@ public class RequestIdContext {
     
     private static final String REQUEST_ID_HEADER = "X-Request-ID";
 
-    private RequestIdContext() {
-    
-    }
+    private RequestIdContext() {}
 
     public static String getOrCreate(HttpServletRequest request){
         String requestId = request.getHeader(REQUEST_ID_HEADER);
