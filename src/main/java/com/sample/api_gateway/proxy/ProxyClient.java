@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.net.URI;
 import java.io.IOException;
@@ -13,7 +14,7 @@ import java.util.Collections;
 
 @Component
 public class ProxyClient {
-    
+
     private final RestClient restClient;
 
     public ProxyClient(RestClient.Builder builder) {
@@ -21,32 +22,40 @@ public class ProxyClient {
     }
 
     public ResponseEntity<byte[]> forward(
-        GatewayRequestModel context,
-        HttpServletRequest request,
-        byte[] body
-    ) {
+            GatewayRequestModel context,
+            HttpServletRequest request,
+            byte[] body) {
         URI targetUri = buildTargetUri(context, request);
 
         HttpHeaders headers = copyHeaders(request);
         headers.set("X-Request-ID", context.getRequestId());
 
-        return restClient
-                .method(HttpMethod.valueOf(context.getMethod()))
-                .uri(targetUri)
-                .headers(targetHeaders -> targetHeaders.addAll(headers))
-                .body(body == null ? new byte[0] : body)
-                .exchange((requestSpec, responseSpec) -> {
-                    HttpHeaders responseHeaders = new HttpHeaders();
-                    responseHeaders.addAll(responseSpec.getHeaders());
-                    responseHeaders.set("X-Request-ID", context.getRequestId());
+        try {
+            return restClient
+                    .method(HttpMethod.valueOf(context.getMethod()))
+                    .uri(targetUri)
+                    .headers(targetHeaders -> targetHeaders.addAll(headers))
+                    .body(body == null ? new byte[0] : body)
+                    .exchange((requestSpec, responseSpec) -> {
+                        HttpHeaders responseHeaders = new HttpHeaders();
+                        responseHeaders.addAll(responseSpec.getHeaders());
+                        responseHeaders.set("X-Request-ID", context.getRequestId());
 
-                    return ResponseEntity.status(responseSpec.getStatusCode())
-                            .headers(responseHeaders)
-                            .body(readResponseBody(responseSpec.getBody()));
-                });
+                        return ResponseEntity.status(responseSpec.getStatusCode())
+                                .headers(responseHeaders)
+                                .body(readResponseBody(responseSpec.getBody()));
+                    });
+        } catch (RestClientException  e) {
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.set("X-Request-ID", context.getRequestId());
+
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .headers(responseHeaders)
+                    .body(new byte[0]);
+        }
     }
 
-    private byte[] readResponseBody(InputStream body){
+    private byte[] readResponseBody(InputStream body) {
         try {
             return body.readAllBytes();
         } catch (IOException e) {
